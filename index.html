@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Expiry Sorter</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        h2 {
+            text-align: center;
+            color: #f59e0b;
+            margin-bottom: 8px;
+        }
+        p.subtitle {
+            text-align: center;
+            font-size: 12px;
+            color: #a0a0a0;
+            margin-bottom: 20px;
+        }
+        label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #d1d5db;
+            display: block;
+            margin-bottom: 8px;
+        }
+        textarea {
+            width: 100%;
+            height: 180px;
+            background-color: #2a2a2a;
+            color: #ffffff;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 14px;
+            resize: vertical;
+            outline: none;
+        }
+        textarea:focus { border-color: #f59e0b; }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-primary { background-color: #f59e0b; color: #121212; }
+        .btn-primary:hover { background-color: #d97706; }
+        .btn-secondary { background-color: #374151; color: #ffffff; }
+        .btn-secondary:hover { background-color: #4b5563; }
+        .output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+        .copy-btn {
+            background-color: #059669;
+            color: #fff;
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 6px;
+        }
+        .copy-btn:hover { background-color: #047857; }
+        .result-box {
+            background-color: #0d0d0d;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 14px;
+            color: #34d399;
+            min-height: 100px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>🍱 Food Expiry Sorter</h2>
+    <p class="subtitle">Categorize & count expiring food items automatically</p>
+    <label for="rawInput">Enter / Paste Food List:</label>
+    <textarea id="rawInput" placeholder="Chicken puff 11/14&#10;chicken puf 11/14&#10;Fish pastry 11/16"></textarea>
+    <div class="btn-group">
+        <button class="btn-primary" onclick="processList()">⚡ Generate Summary</button>
+        <button class="btn-secondary" onclick="clearAll()">🗑️ Clear</button>
+    </div>
+    <div class="output-header">
+        <label style="margin:0;">Processed Output:</label>
+        <button class="copy-btn" onclick="copyResult()">📋 Copy Result</button>
+    </div>
+    <div class="result-box" id="resultOutput">Results will appear here...</div>
+</div>
+<script>
+    function getLevenshteinDistance(a, b) {
+        const matrix = [];
+        for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+        for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+        for (let i = 1; i <= b.length; i++) {
+            for (let j = 1; j <= a.length; j++) {
+                if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1,
+                        matrix[i][j - 1] + 1,
+                        matrix[i - 1][j] + 1
+                    );
+                }
+            }
+        }
+        return matrix[b.length][a.length];
+    }
+
+    function isSimilar(s1, s2) {
+        const str1 = s1.toLowerCase().trim();
+        const str2 = s2.toLowerCase().trim();
+        if (str1 === str2) return true;
+        const maxLen = Math.max(str1.length, str2.length);
+        if (maxLen <= 4) return str1 === str2;
+        return getLevenshteinDistance(str1, str2) <= 2;
+    }
+
+    function processList() {
+        const input = document.getElementById('rawInput').value.trim();
+        if (!input) {
+            document.getElementById('resultOutput').innerText = "Please paste or enter some data first!";
+            return;
+        }
+        const lines = input.split('\n');
+        const expiryData = {};
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+            const parts = trimmed.split(/\s+/);
+            if (parts.length < 2) return;
+            const dateStr = parts[parts.length - 1];
+            const rawFoodName = parts.slice(0, parts.length - 1).join(' ');
+            if (!expiryData[dateStr]) expiryData[dateStr] = {};
+            let matchedKey = null;
+            for (let existingFood of Object.keys(expiryData[dateStr])) {
+                if (isSimilar(existingFood, rawFoodName)) {
+                    matchedKey = existingFood;
+                    break;
+                }
+            }
+            if (matchedKey) expiryData[dateStr][matchedKey] += 1;
+            else expiryData[dateStr][rawFoodName] = 1;
+        });
+        let outputText = "";
+        const sortedDates = Object.keys(expiryData).sort();
+        sortedDates.forEach((date, index) => {
+            outputText += `${date} expire\n\n`;
+            for (const [food, count] of Object.entries(expiryData[date])) {
+                outputText += `${food}=${count}\n`;
+            }
+            if (index < sortedDates.length - 1) outputText += "\n";
+        });
+        document.getElementById('resultOutput').innerText = outputText || "No valid input detected!";
+    }
+
+    function copyResult() {
+        const text = document.getElementById('resultOutput').innerText;
+        if (!text || text.startsWith("Results will appear") || text.startsWith("Please paste")) return;
+        navigator.clipboard.writeText(text).then(() => {
+            alert("Results copied to clipboard!");
+        }).catch(() => {
+            alert("Clipboard copy failed. Please select and copy the result manually.");
+        });
+    }
+
+    function clearAll() {
+        document.getElementById('rawInput').value = "";
+        document.getElementById('resultOutput').innerText = "Results will appear here...";
+    }
+</script>
+</body>
+</html>
